@@ -1,17 +1,22 @@
-'use client'
+'use client';
 
-import { Button } from '@mondaysagefx/ui'
-import { useRouter } from 'next/navigation'
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { LoginForm } from './auth/login-form';
 
 export default function Home() {
-  const router = useRouter()
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      router.push('/dashboard');
+    }
+  }, [router]);
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <h1 className="text-4xl font-bold">Monday Sage FX</h1>
-        <Button onClick={() => router.push('/auth')}>Get Started</Button>
-      </div>
+      <LoginForm />
     </main>
-  )
-} 
+  );
+}
