@@ -27,7 +27,8 @@ export class AuthController {
   @UseGuards(LocalAuthGuard)
   @Post('login')
   async login(@Body() body: { email: string; password: string }) {
-    return this.authService.login(body);
+    const user = await this.authService.validateUser(body.email, body.password);
+    return this.authService.login(user);
   }
 
   @Public()
