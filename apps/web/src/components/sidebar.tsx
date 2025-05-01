@@ -8,12 +8,29 @@ export function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [isSmsOpen, setIsSmsOpen] = useState(false);
+  const [isBoardsOpen, setIsBoardsOpen] = useState(false);
 
   const menuItems = [
     {
       label: 'Dashboard',
       path: '/dashboard',
       icon: '📊',
+    },
+    {
+      label: 'Homologation',
+      icon: '📋',
+      submenu: [
+        {
+          label: 'Board Mapping',
+          path: '/dashboard/boards/mapping',
+          icon: '🗺️',
+        },
+        {
+          label: 'Validation Rules',
+          path: '/dashboard/boards/validation',
+          icon: '✅',
+        },
+      ],
     },
     {
       label: 'SMS',
@@ -41,16 +58,30 @@ export function Sidebar() {
             {item.submenu ? (
               <div>
                 <button
-                  onClick={() => setIsSmsOpen(!isSmsOpen)}
+                  onClick={() => {
+                    if (item.label === 'SMS') {
+                      setIsSmsOpen(!isSmsOpen);
+                      setIsBoardsOpen(false);
+                    } else if (item.label === 'Homologation') {
+                      setIsBoardsOpen(!isBoardsOpen);
+                      setIsSmsOpen(false);
+                    }
+                  }}
                   className="w-full flex items-center justify-between p-2 text-gray-700 hover:bg-gray-100 rounded-lg"
                 >
                   <span className="flex items-center">
                     <span className="mr-2">{item.icon}</span>
                     {item.label}
                   </span>
-                  <span>{isSmsOpen ? '▼' : '▶'}</span>
+                  <span>
+                    {(item.label === 'SMS' && isSmsOpen) ||
+                    (item.label === 'Homologation' && isBoardsOpen)
+                      ? '▼'
+                      : '▶'}
+                  </span>
                 </button>
-                {isSmsOpen && (
+                {((item.label === 'SMS' && isSmsOpen) ||
+                  (item.label === 'Homologation' && isBoardsOpen)) && (
                   <div className="ml-4 mt-2 space-y-2">
                     {item.submenu.map(subItem => (
                       <Button
