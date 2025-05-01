@@ -1,29 +1,27 @@
-import { Module } from '@nestjs/common'
-import { ConfigModule } from '@nestjs/config'
-import { LoggerModule } from 'nestjs-pino'
-import { BullModule } from '@nestjs/bull'
-import { PrismaModule } from './prisma/prisma.module'
-import { AuthModule } from './auth/auth.module'
-import { UsersModule } from './users/users.module'
-import { MondayModule } from './monday/monday.module'
-import { SmsModule } from './sms/sms.module'
-import { PdfModule } from './pdf/pdf.module'
-import * as path from 'path'
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { LoggerModule } from 'nestjs-pino';
+import { BullModule } from '@nestjs/bull';
+import { PrismaModule } from './prisma/prisma.module';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { MondayModule } from './monday/monday.module';
+import { SmsModule } from './sms/sms.module';
+import { PdfModule } from './pdf/pdf.module';
+import * as path from 'path';
+import * as fs from 'fs';
 
-// Debug environment variables
-console.log('Environment Variables:', {
-  NODE_ENV: process.env.NODE_ENV,
-  JWT_SECRET: process.env.JWT_SECRET ? 'Set' : 'Not Set',
-  JWT_SECRET_LENGTH: process.env.JWT_SECRET?.length,
-  MONDAY_CLIENT_ID: process.env.MONDAY_CLIENT_ID ? 'Set' : 'Not Set',
-  MONDAY_CALLBACK_URL: process.env.MONDAY_CALLBACK_URL
-})
+// Debug environment variables and .env file
+const envPath = path.resolve(process.cwd(), '../../.env');
+console.log('Current working directory:', process.cwd());
+console.log('Looking for .env file at:', envPath);
+console.log('.env file exists:', fs.existsSync(envPath));
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: path.resolve(process.cwd(), '.env'),
+      envFilePath: envPath,
       cache: true,
       expandVariables: true,
     }),
@@ -42,4 +40,4 @@ console.log('Environment Variables:', {
     PdfModule,
   ],
 })
-export class AppModule {} 
+export class AppModule {}
