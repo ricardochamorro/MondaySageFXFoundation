@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+**/node_modules
+.pnpm-store
+.npm
+
+# Build outputs
+dist
+build
+.next
+.turbo
+
+# Environment and local files
+.env*
+.local
+*.log
+
+# Version control
+.git
+.gitignore
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+
+# Test coverage
+coverage
+.nyc_output
+
+# Misc
+.DS_Store

@@ -1,0 +1,221 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../node_modules/.prisma/client"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  password      String
+  name          String?
+  avatar        String?
+  state         UserState       @default(REGISTERED)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  AuditLog      AuditLog[]
+  boards        Board[]
+  GoogleAccount GoogleAccount?
+  mondayAccount MondayAccount?
+  PdfReport     PdfReport[]
+  PdfTemplate   PdfTemplate[]
+  SmsAutomation SmsAutomation[]
+  SmsLog        SmsLog[]
+  SmsTemplate   SmsTemplate[]
+  UserRole      UserRole[]
+}
+
+model MondayAccount {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  accountId    String
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model Board {
+  id            String          @id @default(cuid())
+  mondayId      String          @unique
+  userId        String
+  name          String
+  description   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  user          User            @relation(fields: [userId], references: [id])
+  Column        Column[]
+  items         Item[]
+  PdfTemplate   PdfTemplate[]
+  SmsAutomation SmsAutomation[]
+  SmsTemplate   SmsTemplate[]
+}
+
+model Item {
+  id        String      @id @default(cuid())
+  mondayId  String      @unique
+  boardId   String
+  name      String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  board     Board       @relation(fields: [boardId], references: [id])
+  PdfReport PdfReport[]
+  SmsLog    SmsLog[]
+  Subitem   Subitem[]
+}
+
+model AuditLog {
+  id        String   @id
+  model     String
+  recordId  String
+  action    String
+  diffJson  String
+  actorId   String
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [actorId], references: [id])
+}
+
+model Column {
+  id          String   @id
+  mondayId    String   @unique
+  boardId     String
+  name        String
+  type        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime
+  Board       Board    @relation(fields: [boardId], references: [id])
+}
+
+model GoogleAccount {
+  id           String   @id
+  userId       String   @unique
+  googleId     String
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime
+  User         User     @relation(fields: [userId], references: [id])
+}
+
+model PdfFile {
+  id        String      @id
+  data      Bytes
+  mime      String
+  size      Int
+  sha256    String
+  createdAt DateTime    @default(now())
+  PdfReport PdfReport[]
+}
+
+model PdfReport {
+  id          String      @id
+  templateId  String
+  itemId      String
+  fileId      String
+  createdById String
+  createdAt   DateTime    @default(now())
+  User        User        @relation(fields: [createdById], references: [id])
+  PdfFile     PdfFile     @relation(fields: [fileId], references: [id])
+  Item        Item        @relation(fields: [itemId], references: [id])
+  PdfTemplate PdfTemplate @relation(fields: [templateId], references: [id])
+}
+
+model PdfTemplate {
+  id             String      @id
+  name           String
+  definitionJson String
+  boardId        String
+  creatorId      String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime
+  PdfReport      PdfReport[]
+  Board          Board       @relation(fields: [boardId], references: [id])
+  User           User        @relation(fields: [creatorId], references: [id])
+}
+
+model Role {
+  id          String     @id
+  name        String     @unique
+  permissions String[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime
+  UserRole    UserRole[]
+}
+
+model SmsAutomation {
+  id          String      @id
+  boardId     String
+  ruleJson    String
+  templateId  String
+  isActive    Boolean     @default(true)
+  creatorId   String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime
+  Board       Board       @relation(fields: [boardId], references: [id])
+  User        User        @relation(fields: [creatorId], references: [id])
+  SmsTemplate SmsTemplate @relation(fields: [templateId], references: [id])
+}
+
+model SmsLog {
+  id          String      @id
+  itemId      String
+  templateId  String
+  senderId    String
+  toNumber    String
+  status      String
+  error       String?
+  sentAt      DateTime    @default(now())
+  Item        Item        @relation(fields: [itemId], references: [id])
+  User        User        @relation(fields: [senderId], references: [id])
+  SmsTemplate SmsTemplate @relation(fields: [templateId], references: [id])
+}
+
+model SmsTemplate {
+  id            String          @id
+  name          String
+  body          String
+  placeholders  String[]
+  boardId       String
+  creatorId     String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  SmsAutomation SmsAutomation[]
+  SmsLog        SmsLog[]
+  Board         Board           @relation(fields: [boardId], references: [id])
+  User          User            @relation(fields: [creatorId], references: [id])
+}
+
+model Subitem {
+  id        String   @id
+  mondayId  String   @unique
+  itemId    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  Item      Item     @relation(fields: [itemId], references: [id])
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+  Role      Role     @relation(fields: [roleId], references: [id])
+  User      User     @relation(fields: [userId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+enum UserState {
+  REGISTERED
+  ACTIVE
+  SUSPENDED
+}

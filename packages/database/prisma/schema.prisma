@@ -1,0 +1,222 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  password       String
+  name           String?
+  avatar         String?
+  state          UserState       @default(REGISTERED)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  roles          UserRole[]
+  mondayAccount  MondayAccount?
+  googleAccount  GoogleAccount?
+  smsTemplates   SmsTemplate[]
+  smsAutomations SmsAutomation[]
+  smsLogs        SmsLog[]
+  pdfTemplates   PdfTemplate[]
+  pdfReports     PdfReport[]
+  auditLogs      AuditLog[]
+  boards         Board[]
+}
+
+enum UserState {
+  REGISTERED
+  ACTIVE
+  SUSPENDED
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  permissions String[] // JSON array of permission strings
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  users       UserRole[]
+}
+
+model UserRole {
+  userId    String
+  roleId    String
+  user      User     @relation(fields: [userId], references: [id])
+  role      Role     @relation(fields: [roleId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@id([userId, roleId])
+}
+
+model MondayAccount {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  accountId    String
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model GoogleAccount {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  googleId     String
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model Board {
+  id             String          @id @default(cuid())
+  mondayId       String          @unique
+  userId         String
+  name           String
+  description    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  columns        Column[]
+  items          Item[]
+  smsTemplates   SmsTemplate[]
+  smsAutomations SmsAutomation[]
+  pdfTemplates   PdfTemplate[]
+  user           User            @relation(fields: [userId], references: [id])
+}
+
+model Column {
+  id          String   @id @default(cuid())
+  mondayId    String   @unique
+  boardId     String
+  name        String
+  type        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  board       Board    @relation(fields: [boardId], references: [id])
+}
+
+model Item {
+  id         String      @id @default(cuid())
+  mondayId   String      @unique
+  boardId    String
+  name       String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  board      Board       @relation(fields: [boardId], references: [id])
+  subitems   Subitem[]
+  smsLogs    SmsLog[]
+  pdfReports PdfReport[]
+}
+
+model Subitem {
+  id        String   @id @default(cuid())
+  mondayId  String   @unique
+  itemId    String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  item      Item     @relation(fields: [itemId], references: [id])
+}
+
+model SmsTemplate {
+  id           String          @id @default(cuid())
+  name         String
+  body         String
+  placeholders String[] // JSON array of placeholder strings
+  boardId      String
+  creatorId    String
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  board        Board           @relation(fields: [boardId], references: [id])
+  creator      User            @relation(fields: [creatorId], references: [id])
+  automations  SmsAutomation[]
+  smsLogs      SmsLog[]
+}
+
+model SmsAutomation {
+  id         String      @id @default(cuid())
+  boardId    String
+  ruleJson   String // JSON string containing automation rules
+  templateId String
+  isActive   Boolean     @default(true)
+  creatorId  String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  board      Board       @relation(fields: [boardId], references: [id])
+  template   SmsTemplate @relation(fields: [templateId], references: [id])
+  creator    User        @relation(fields: [creatorId], references: [id])
+}
+
+model SmsLog {
+  id         String      @id @default(cuid())
+  itemId     String
+  templateId String
+  senderId   String
+  toNumber   String
+  status     String
+  error      String?
+  sentAt     DateTime    @default(now())
+  item       Item        @relation(fields: [itemId], references: [id])
+  template   SmsTemplate @relation(fields: [templateId], references: [id])
+  sender     User        @relation(fields: [senderId], references: [id])
+}
+
+model PdfTemplate {
+  id             String      @id @default(cuid())
+  name           String
+  definitionJson String // JSON string containing template definition
+  boardId        String
+  creatorId      String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  board          Board       @relation(fields: [boardId], references: [id])
+  creator        User        @relation(fields: [creatorId], references: [id])
+  reports        PdfReport[]
+}
+
+model PdfFile {
+  id        String      @id @default(cuid())
+  data      Bytes // BYTEA column for PDF binary data
+  mime      String
+  size      Int
+  sha256    String
+  createdAt DateTime    @default(now())
+  reports   PdfReport[]
+}
+
+model PdfReport {
+  id          String      @id @default(cuid())
+  templateId  String
+  itemId      String
+  fileId      String
+  createdById String
+  createdAt   DateTime    @default(now())
+  template    PdfTemplate @relation(fields: [templateId], references: [id])
+  item        Item        @relation(fields: [itemId], references: [id])
+  file        PdfFile     @relation(fields: [fileId], references: [id])
+  createdBy   User        @relation(fields: [createdById], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  model     String
+  recordId  String
+  action    String
+  diffJson  String // JSON string containing before/after state
+  actorId   String
+  createdAt DateTime @default(now())
+  actor     User     @relation(fields: [actorId], references: [id])
+}
