@@ -14,8 +14,8 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { Public } from './decorators/public.decorator';
 import { AuthGuard } from '@nestjs/passport';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { Request, Response } from 'express';
-import { User } from '@prisma/client';
+import { Response } from 'express';
+import { AuthenticatedRequest } from './types';
 
 @Controller('auth')
 export class AuthController {
@@ -33,14 +33,22 @@ export class AuthController {
   @Public()
   @Get('monday')
   @UseGuards(AuthGuard('monday'))
-  async mondayAuth() {
-    // This will redirect to Monday.com OAuth page
+  async mondayAuth(@Req() req: AuthenticatedRequest) {
+    // Store the JWT token and return URL in the session for later use
+    const token = req.query.token as string;
+    const returnUrl = req.query.returnUrl as string;
+    if (token) {
+      req.session.jwtToken = token;
+    }
+    if (returnUrl) {
+      req.session.returnUrl = returnUrl;
+    }
   }
 
   @Public()
   @Get('monday/callback')
   @UseGuards(AuthGuard('monday'))
-  async mondayCallback(@Req() req: Request, @Res() res: Response) {
+  async mondayCallback(@Req() req: AuthenticatedRequest, @Res() res: Response) {
     try {
       this.logger.debug('Monday.com callback received:', {
         hasUser: !!req.user,
@@ -72,18 +80,25 @@ export class AuthController {
         throw new UnauthorizedException('No user data received from Monday.com');
       }
 
-      const user = req.user as User;
+      const user = req.user;
       this.logger.debug('User data received:', {
         id: user.id,
-        email: user.email,
         hasMondayAccount: !!user.mondayAccount,
       });
 
-      const token = await this.authService.login(user);
+      // Use the stored JWT token if available
+      const token = req.session.jwtToken
+        ? { access_token: req.session.jwtToken }
+        : await this.authService.login(user);
 
       const frontendUrl = process.env.FRONTEND_URL || 'https://monday.sagefxfoundation.com';
-      const redirectUrl = `${frontendUrl}/auth/callback?token=${token.access_token}`;
-      this.logger.debug('Redirecting to frontend:', { redirectUrl, frontendUrl });
+      const returnUrl = req.session.returnUrl || '/dashboard';
+      const redirectUrl = `${frontendUrl}/auth/callback?token=${token.access_token}&returnUrl=${encodeURIComponent(returnUrl)}`;
+      this.logger.debug('Redirecting to frontend:', { redirectUrl, frontendUrl, returnUrl });
+
+      // Clear the stored session data
+      delete req.session.jwtToken;
+      delete req.session.returnUrl;
 
       // Redirect to frontend with token
       res.redirect(redirectUrl);
@@ -105,24 +120,58 @@ export class AuthController {
 
   @Get('monday/token')
   @UseGuards(JwtAuthGuard)
-  async getMondayToken(@Req() req: Request) {
+  async getMondayToken(@Req() req: AuthenticatedRequest) {
     try {
       this.logger.debug('Getting Monday.com token for user:', {
-        userId: req.user.id,
-        hasMondayAccount: !!req.user.mondayAccount,
+        userId: req.user?.id,
+        hasMondayAccount: !!req.user?.mondayAccount,
       });
 
-      if (!req.user.mondayAccount) {
-        throw new UnauthorizedException('No Monday.com account found for user');
+      if (!req.user) {
+        throw new UnauthorizedException('User not authenticated');
       }
 
-      // Check if token is expired
-      if (new Date(req.user.mondayAccount.expiresAt) <= new Date()) {
-        throw new UnauthorizedException('Monday.com token has expired');
+      if (!req.user.mondayAccount) {
+        this.logger.error('No Monday.com account found for user:', {
+          userId: req.user.id,
+          userEmail: req.user.email,
+        });
+        throw new UnauthorizedException(
+          'No Monday.com account found for user. Please connect your Monday.com account first.'
+        );
+      }
+
+      // Check if token is about to expire (within 1 hour)
+      const expirationThreshold = new Date(Date.now() + 60 * 60 * 1000);
+      if (new Date(req.user.mondayAccount.expiresAt) <= expirationThreshold) {
+        this.logger.debug('Monday.com token needs refresh:', {
+          userId: req.user.id,
+          expiresAt: req.user.mondayAccount.expiresAt,
+        });
+
+        // Attempt to refresh the token
+        try {
+          const refreshedToken = await this.authService.refreshMondayToken(
+            req.user.mondayAccount.refreshToken,
+            req.user.id
+          );
+          return {
+            access_token: refreshedToken.accessToken,
+            expires_at: refreshedToken.expiresAt,
+          };
+        } catch (refreshError) {
+          this.logger.error('Error refreshing Monday.com token:', {
+            message: refreshError.message,
+            stack: refreshError.stack,
+            userId: req.user?.id,
+          });
+          throw refreshError;
+        }
       }
 
       return {
-        accessToken: req.user.mondayAccount.accessToken,
+        access_token: req.user.mondayAccount.accessToken,
+        expires_at: req.user.mondayAccount.expiresAt,
       };
     } catch (error) {
       this.logger.error('Error getting Monday.com token:', {

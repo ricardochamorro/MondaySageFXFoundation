@@ -1,0 +1,43 @@
+// tsup.config.ts
+import { defineConfig } from "tsup";
+import postcss from "postcss";
+import postcssPresetEnv from "postcss-preset-env";
+import tailwindcss from "tailwindcss";
+import autoprefixer from "autoprefixer";
+import fs from "fs/promises";
+var tsup_config_default = defineConfig({
+  entry: ["src/index.ts"],
+  format: ["esm", "cjs"],
+  dts: false,
+  clean: true,
+  external: ["react"],
+  inject: ["src/react-shim.js"],
+  noExternal: ["@radix-ui/react-icons"],
+  treeshake: true,
+  splitting: false,
+  sourcemap: true,
+  minify: true,
+  esbuildOptions(options) {
+    options.jsx = "automatic";
+    options.loader = {
+      ...options.loader,
+      ".postcss": "css"
+    };
+  },
+  async onSuccess() {
+    const postcssProcessor = postcss([
+      tailwindcss,
+      postcssPresetEnv,
+      autoprefixer
+    ]);
+    const result = await postcssProcessor.process(
+      await fs.readFile("src/styles.postcss", "utf-8"),
+      { from: "src/styles.postcss", to: "dist/styles.css" }
+    );
+    await fs.writeFile("dist/styles.css", result.css);
+  }
+});
+export {
+  tsup_config_default as default
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsidHN1cC5jb25maWcudHMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImNvbnN0IF9faW5qZWN0ZWRfZmlsZW5hbWVfXyA9IFwiL29wdC9tb25kYXlzYWdlZngvcGFja2FnZXMvdWkvdHN1cC5jb25maWcudHNcIjtjb25zdCBfX2luamVjdGVkX2Rpcm5hbWVfXyA9IFwiL29wdC9tb25kYXlzYWdlZngvcGFja2FnZXMvdWlcIjtjb25zdCBfX2luamVjdGVkX2ltcG9ydF9tZXRhX3VybF9fID0gXCJmaWxlOi8vL29wdC9tb25kYXlzYWdlZngvcGFja2FnZXMvdWkvdHN1cC5jb25maWcudHNcIjtpbXBvcnQgeyBkZWZpbmVDb25maWcgfSBmcm9tICd0c3VwJztcbmltcG9ydCBwb3N0Y3NzIGZyb20gJ3Bvc3Rjc3MnO1xuaW1wb3J0IHBvc3Rjc3NQcmVzZXRFbnYgZnJvbSAncG9zdGNzcy1wcmVzZXQtZW52JztcbmltcG9ydCB0YWlsd2luZGNzcyBmcm9tICd0YWlsd2luZGNzcyc7XG5pbXBvcnQgYXV0b3ByZWZpeGVyIGZyb20gJ2F1dG9wcmVmaXhlcic7XG5pbXBvcnQgZnMgZnJvbSAnZnMvcHJvbWlzZXMnO1xuXG5leHBvcnQgZGVmYXVsdCBkZWZpbmVDb25maWcoe1xuICBlbnRyeTogWydzcmMvaW5kZXgudHMnXSxcbiAgZm9ybWF0OiBbJ2VzbScsICdjanMnXSxcbiAgZHRzOiBmYWxzZSxcbiAgY2xlYW46IHRydWUsXG4gIGV4dGVybmFsOiBbJ3JlYWN0J10sXG4gIGluamVjdDogWydzcmMvcmVhY3Qtc2hpbS5qcyddLFxuICBub0V4dGVybmFsOiBbJ0ByYWRpeC11aS9yZWFjdC1pY29ucyddLFxuICB0cmVlc2hha2U6IHRydWUsXG4gIHNwbGl0dGluZzogZmFsc2UsXG4gIHNvdXJjZW1hcDogdHJ1ZSxcbiAgbWluaWZ5OiB0cnVlLFxuICBlc2J1aWxkT3B0aW9ucyhvcHRpb25zKSB7XG4gICAgb3B0aW9ucy5qc3ggPSAnYXV0b21hdGljJztcbiAgICBvcHRpb25zLmxvYWRlciA9IHtcbiAgICAgIC4uLm9wdGlvbnMubG9hZGVyLFxuICAgICAgJy5wb3N0Y3NzJzogJ2NzcycsXG4gICAgfTtcbiAgfSxcbiAgYXN5bmMgb25TdWNjZXNzKCkge1xuICAgIGNvbnN0IHBvc3Rjc3NQcm9jZXNzb3IgPSBwb3N0Y3NzKFtcbiAgICAgIHRhaWx3aW5kY3NzLFxuICAgICAgcG9zdGNzc1ByZXNldEVudixcbiAgICAgIGF1dG9wcmVmaXhlcixcbiAgICBdKTtcbiAgICBcbiAgICBjb25zdCByZXN1bHQgPSBhd2FpdCBwb3N0Y3NzUHJvY2Vzc29yLnByb2Nlc3MoXG4gICAgICBhd2FpdCBmcy5yZWFkRmlsZSgnc3JjL3N0eWxlcy5wb3N0Y3NzJywgJ3V0Zi04JyksXG4gICAgICB7IGZyb206ICdzcmMvc3R5bGVzLnBvc3Rjc3MnLCB0bzogJ2Rpc3Qvc3R5bGVzLmNzcycgfVxuICAgICk7XG4gICAgXG4gICAgYXdhaXQgZnMud3JpdGVGaWxlKCdkaXN0L3N0eWxlcy5jc3MnLCByZXN1bHQuY3NzKTtcbiAgfSxcbn0pOyAiXSwKICAibWFwcGluZ3MiOiAiO0FBQXFPLFNBQVMsb0JBQW9CO0FBQ2xRLE9BQU8sYUFBYTtBQUNwQixPQUFPLHNCQUFzQjtBQUM3QixPQUFPLGlCQUFpQjtBQUN4QixPQUFPLGtCQUFrQjtBQUN6QixPQUFPLFFBQVE7QUFFZixJQUFPLHNCQUFRLGFBQWE7QUFBQSxFQUMxQixPQUFPLENBQUMsY0FBYztBQUFBLEVBQ3RCLFFBQVEsQ0FBQyxPQUFPLEtBQUs7QUFBQSxFQUNyQixLQUFLO0FBQUEsRUFDTCxPQUFPO0FBQUEsRUFDUCxVQUFVLENBQUMsT0FBTztBQUFBLEVBQ2xCLFFBQVEsQ0FBQyxtQkFBbUI7QUFBQSxFQUM1QixZQUFZLENBQUMsdUJBQXVCO0FBQUEsRUFDcEMsV0FBVztBQUFBLEVBQ1gsV0FBVztBQUFBLEVBQ1gsV0FBVztBQUFBLEVBQ1gsUUFBUTtBQUFBLEVBQ1IsZUFBZSxTQUFTO0FBQ3RCLFlBQVEsTUFBTTtBQUNkLFlBQVEsU0FBUztBQUFBLE1BQ2YsR0FBRyxRQUFRO0FBQUEsTUFDWCxZQUFZO0FBQUEsSUFDZDtBQUFBLEVBQ0Y7QUFBQSxFQUNBLE1BQU0sWUFBWTtBQUNoQixVQUFNLG1CQUFtQixRQUFRO0FBQUEsTUFDL0I7QUFBQSxNQUNBO0FBQUEsTUFDQTtBQUFBLElBQ0YsQ0FBQztBQUVELFVBQU0sU0FBUyxNQUFNLGlCQUFpQjtBQUFBLE1BQ3BDLE1BQU0sR0FBRyxTQUFTLHNCQUFzQixPQUFPO0FBQUEsTUFDL0MsRUFBRSxNQUFNLHNCQUFzQixJQUFJLGtCQUFrQjtBQUFBLElBQ3REO0FBRUEsVUFBTSxHQUFHLFVBQVUsbUJBQW1CLE9BQU8sR0FBRztBQUFBLEVBQ2xEO0FBQ0YsQ0FBQzsiLAogICJuYW1lcyI6IFtdCn0K

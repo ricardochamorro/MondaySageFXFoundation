@@ -9,18 +9,21 @@ export function Navbar() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    // Check both localStorage and sessionStorage for the token
+    const token = localStorage.getItem('token') || sessionStorage.getItem('token');
     setIsAuthenticated(!!token);
   }, []);
 
   const handleLogout = () => {
+    // Clear token from both storages
     localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     setIsAuthenticated(false);
-    router.push('/');
+    router.push('/auth/login');
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center">
+    <nav className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 px-4 py-2 flex justify-between items-center z-50">
       <div className="text-xl font-bold">Monday Sage FX</div>
       <div>
         {isAuthenticated && (

@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Select } from '@/components/ui/select';
 import { TemplateEditor } from './template-editor';
 import { MondayService } from '@/services/monday';
+import { Button } from '@mondaysagefx/ui';
+import { useMondayAuth } from '@/hooks/useMondayAuth';
 
 interface Group {
   id: string;
@@ -23,6 +25,12 @@ interface Column {
   type: string;
 }
 
+interface TemplateColumn {
+  id: string;
+  name: string;
+  type: string;
+}
+
 interface TemplateMetadata {
   name: string;
   description: string;
@@ -35,38 +43,54 @@ export default function TemplatesPage() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedBoard, setSelectedBoard] = useState<string>('');
-  const [columns, setColumns] = useState<Column[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [columns, setColumns] = useState<TemplateColumn[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const { isMondayConnected, isLoading, connectToMonday } = useMondayAuth();
+
+  const fetchMondayToken = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/auth/login');
+        return;
+      }
+
+      const response = await fetch('/api/auth/monday/token', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        if (response.redirected) {
+          window.location.href = response.url;
+          return;
+        }
+        const error = await response.json();
+        if (error.message?.includes('No Monday.com account found')) {
+          setError('Please connect your Monday.com account to continue');
+          return;
+        }
+        throw new Error(error.message || 'Failed to get Monday.com token');
+      }
+
+      const data = await response.json();
+      if (!data.access_token) {
+        throw new Error('No access token received');
+      }
+      return data.access_token;
+    } catch (err) {
+      console.error('Error fetching Monday.com token:', err);
+      throw err;
+    }
+  }, [router]);
 
   useEffect(() => {
-    const fetchMondayToken = async () => {
-      try {
-        const response = await fetch('/api/auth/monday/token', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to get Monday.com token');
-        }
-        const { accessToken } = await response.json();
-        if (!accessToken) {
-          throw new Error('No access token received');
-        }
-        return accessToken;
-      } catch (err) {
-        console.error('Error fetching Monday.com token:', err);
-        throw err;
-      }
-    };
-
     const fetchGroups = async () => {
       try {
-        setLoading(true);
         setError(null);
         const accessToken = await fetchMondayToken();
+        if (!accessToken) return; // Early return if no token (error already set)
         const mondayService = new MondayService(accessToken);
         const groupsData = await mondayService.getGroups();
         setGroups(groupsData);
@@ -77,37 +101,13 @@ export default function TemplatesPage() {
             ? err.message
             : 'Failed to fetch workspaces. Please check your Monday.com connection and try again.'
         );
-      } finally {
-        setLoading(false);
       }
     };
 
     fetchGroups();
-  }, [router]);
+  }, [fetchMondayToken]);
 
   useEffect(() => {
-    const fetchMondayToken = async () => {
-      try {
-        const response = await fetch('/api/auth/monday/token', {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        });
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to get Monday.com token');
-        }
-        const { accessToken } = await response.json();
-        if (!accessToken) {
-          throw new Error('No access token received');
-        }
-        return accessToken;
-      } catch (err) {
-        console.error('Error fetching Monday.com token:', err);
-        throw err;
-      }
-    };
-
     const fetchBoards = async () => {
       if (!selectedGroup) {
         setBoards([]);
@@ -128,12 +128,18 @@ export default function TemplatesPage() {
     };
 
     fetchBoards();
-  }, [selectedGroup]);
+  }, [selectedGroup, fetchMondayToken]);
 
   useEffect(() => {
     if (selectedBoard) {
       const selectedBoardData = boards.find(board => board.id === selectedBoard);
-      setColumns(selectedBoardData?.columns || []);
+      setColumns(
+        selectedBoardData?.columns.map(col => ({
+          id: col.id,
+          name: col.title,
+          type: col.type,
+        })) || []
+      );
     } else {
       setColumns([]);
     }
@@ -144,27 +150,43 @@ export default function TemplatesPage() {
     // TODO: Implement template saving logic
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Loading workspaces...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (!isMondayConnected) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <p className="text-red-600">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-        >
-          Try Again
-        </button>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-lg">
+          <div className="text-center">
+            <h2 className="mt-6 text-3xl font-bold text-gray-900">Connection Required</h2>
+            <p className="mt-2 text-sm text-gray-600">{error}</p>
+          </div>
+
+          <div className="mt-8 space-y-4">
+            <Button
+              onClick={connectToMonday}
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Connect Monday.com Account
+            </Button>
+
+            <Button
+              onClick={() => router.push('/dashboard')}
+              variant="outline"
+              className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              Return to Dashboard
+            </Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -173,11 +195,8 @@ export default function TemplatesPage() {
     <div className="space-y-6">
       <div className="flex gap-4">
         <div className="w-1/2">
-          <Select
-            value={selectedGroup}
-            onValueChange={setSelectedGroup}
-            placeholder="Select a workspace"
-          >
+          <div className="mb-2 text-sm font-medium text-gray-700">Workspace</div>
+          <Select value={selectedGroup} onValueChange={setSelectedGroup}>
             {groups.map(group => (
               <option key={group.id} value={group.id}>
                 {group.name}
@@ -186,12 +205,8 @@ export default function TemplatesPage() {
           </Select>
         </div>
         <div className="w-1/2">
-          <Select
-            value={selectedBoard}
-            onValueChange={setSelectedBoard}
-            placeholder="Select a board"
-            disabled={!selectedGroup}
-          >
+          <div className="mb-2 text-sm font-medium text-gray-700">Board</div>
+          <Select value={selectedBoard} onValueChange={setSelectedBoard}>
             {boards.map(board => (
               <option key={board.id} value={board.id}>
                 {board.name}
@@ -201,16 +216,7 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      {columns.length > 0 && (
-        <TemplateEditor
-          columns={columns.map(col => ({
-            id: col.id,
-            name: col.title,
-            type: col.type,
-          }))}
-          onSave={handleSave}
-        />
-      )}
+      <TemplateEditor columns={columns} onSave={handleSave} />
     </div>
   );
 }
