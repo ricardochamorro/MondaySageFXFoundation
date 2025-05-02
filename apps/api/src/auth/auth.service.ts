@@ -5,6 +5,7 @@ import { compare } from 'bcrypt';
 import axios, { AxiosError } from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { User, UserState } from '@prisma/client';
+import { ConfigService } from '@nestjs/config';
 
 interface MondayProfile {
   id: string;
@@ -27,6 +28,12 @@ interface MondayTokenResponse {
   token_type?: string;
 }
 
+interface MondayCallbackUser {
+  id: string;
+  email: string;
+  name: string;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -34,7 +41,8 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-    private prisma: PrismaService
+    private prisma: PrismaService,
+    private readonly configService: ConfigService
   ) {}
 
   async validateUser(email: string, password: string): Promise<UserWithoutPassword> {
@@ -180,6 +188,27 @@ export class AuthService {
         status: error instanceof AxiosError ? error.response?.status : undefined,
         stack: error instanceof Error ? error.stack : undefined,
       });
+      throw error;
+    }
+  }
+
+  async handleMondayCallback(user: MondayCallbackUser) {
+    try {
+      const token = await this.jwtService.signAsync({
+        sub: user.id,
+        email: user.email,
+        name: user.name,
+      });
+
+      const frontendUrl = this.configService.get<string>(
+        'FRONTEND_URL',
+        'https://monday.sagefxfoundation.com'
+      );
+      const redirectUrl = `${frontendUrl}/auth/callback?token=${token}`;
+
+      return { redirectUrl };
+    } catch (error) {
+      this.logger.error('Error handling Monday.com callback:', error);
       throw error;
     }
   }

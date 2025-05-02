@@ -21,7 +21,7 @@ import { AuthenticatedRequest } from './types';
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Public()
   @UseGuards(LocalAuthGuard)
@@ -34,89 +34,16 @@ export class AuthController {
   @Public()
   @Get('monday')
   @UseGuards(AuthGuard('monday'))
-  async mondayAuth(@Req() req: AuthenticatedRequest) {
-    // Store the JWT token and return URL in the session for later use
-    const token = req.query.token as string;
-    const returnUrl = req.query.returnUrl as string;
-    if (token) {
-      req.session.jwtToken = token;
-    }
-    if (returnUrl) {
-      req.session.returnUrl = returnUrl;
-    }
+  async mondayAuth() {
+    // This route initiates the Monday.com OAuth flow
   }
 
   @Public()
   @Get('monday/callback')
   @UseGuards(AuthGuard('monday'))
-  async mondayCallback(@Req() req: AuthenticatedRequest, @Res() res: Response) {
-    try {
-      this.logger.debug('Monday.com callback received:', {
-        hasUser: !!req.user,
-        query: req.query,
-        headers: req.headers,
-        cookies: req.cookies,
-        body: req.body,
-        rawBody: req.rawBody,
-        params: req.params,
-        originalUrl: req.originalUrl,
-        method: req.method,
-        session: req.session,
-        passport: req._passport,
-      });
-
-      if (!req.user) {
-        this.logger.error('No user data received from Monday.com', {
-          query: req.query,
-          headers: req.headers,
-          body: req.body,
-          rawBody: req.rawBody,
-          params: req.params,
-          originalUrl: req.originalUrl,
-          method: req.method,
-          session: req.session,
-          passport: req._passport,
-          stack: new Error().stack,
-        });
-        throw new UnauthorizedException('No user data received from Monday.com');
-      }
-
-      const user = req.user;
-      this.logger.debug('User data received:', {
-        id: user.id,
-        hasMondayAccount: !!user.mondayAccount,
-      });
-
-      // Use the stored JWT token if available
-      const token = req.session.jwtToken
-        ? { access_token: req.session.jwtToken }
-        : await this.authService.login(user);
-
-      const frontendUrl = process.env.FRONTEND_URL || 'https://monday.sagefxfoundation.com';
-      const returnUrl = req.session.returnUrl || '/dashboard';
-      const redirectUrl = `${frontendUrl}/auth/callback?token=${token.access_token}&returnUrl=${encodeURIComponent(returnUrl)}`;
-      this.logger.debug('Redirecting to frontend:', { redirectUrl, frontendUrl, returnUrl });
-
-      // Clear the stored session data
-      delete req.session.jwtToken;
-      delete req.session.returnUrl;
-
-      // Redirect to frontend with token
-      res.redirect(redirectUrl);
-    } catch (error) {
-      this.logger.error('Error in Monday.com callback:', {
-        message: error.message,
-        stack: error.stack,
-        query: req.query,
-        headers: req.headers,
-        cookies: req.cookies,
-      });
-
-      // Redirect to frontend with error
-      const frontendUrl = process.env.FRONTEND_URL || 'https://monday.sagefxfoundation.com';
-      const errorMessage = encodeURIComponent(error.message || 'Authentication failed');
-      res.redirect(`${frontendUrl}/auth/error?message=${errorMessage}`);
-    }
+  async mondayCallback(@Req() req, @Res() res: Response) {
+    const result = await this.authService.handleMondayCallback(req.user);
+    res.redirect(result.redirectUrl);
   }
 
   @Get('monday/token')
